@@ -1,4 +1,4 @@
-import random.choice, math
+import random, math
 import utils
 
 class ArffProcessor(object):
@@ -106,7 +106,7 @@ class ArffProcessor(object):
             if isinstance(attr_values, list):
                 # It's nominal
                 # Create a counter for each nominal bin
-                count = []
+                count = {}
                 for label in attr_values:
                     count[label] = 0
                 # Find out how many times each 
@@ -146,20 +146,61 @@ class ArffProcessor(object):
                 # something has definitely gone wrong in that case
                 raise NotImplementedError("Need to implement handling for types beyond categorical and numeric")
 
-    def entropy_discretize_numerics(self, core_attribute, gain_threshold=.1):
+    def entropy_discretize_single_numeric(self, numeric_attribute, core_attribute, gain_threshold=.05):
+        self.map_attributes_to_num()
+        # TODO
+
+    def entropy_discretize_numerics(self, core_attribute, gain_threshold=.05):
         """ Converts all numerical attributes to categorical
         Uses entropy based discretization. 
         """
         self.map_attributes_to_num()
         for attribute in self.attributes:
             # We are only concerned with numeric attributes
-            if attribute[1].lower() == "numeric":
+            if attribute[1] == "numeric":
                 attr_name = attribute[0]
                 # Sort the data into ascending order based on that attribute
                 self.data.sort(key=lambda x : x[self.attr_position[attr_name]])
                 attr_ranges = []
-                self.get_splits(0, len(self.data), attr_name, core_attribute, gain_threshold, attr_ranges)
-                # TODO: CONTINUE HERE
+                self.get_splits(0, len(self.data) - 1, attr_name, core_attribute, gain_threshold, attr_ranges)
+                # We now have the bin ranges for this attribute
+                # We need to create the bin objects for this attribute
+                attr_bins = []
+                for pair in attr_ranges:
+                    lower_bound = self.data[pair[0]][self.attr_position[attr_name]]
+                    upper_bound = self.data[pair[1]][self.attr_position[attr_name]]
+                    attr_bins.append(utils.NumericalDataBin(gte=lower_bound, lt=upper_bound))
+                # Sort the attribute bins on one of their bounds
+                attr_bins.sort(key=lambda x : x.min)
+                # Set the lowest bins minimum to -Infinity and the highest bins max to Infinity
+                attr_bins[0].min = -float("inf")
+                attr_bins[-1].max = float("inf")
+                #Stitch the bins together to complete the continuous range
+                for i in range(1, len(attr_bins)):
+                    attr_bins[i].min = attr_bins[i - 1].max
+                # Apply these bins to the data values
+                for entry in self.data:
+                    attr_value = entry[self.attr_position[attr_name]]
+                    entry[self.attr_position[attr_name]] = self.get_bin(attr_bins, attr_value)
+                # The attributes are tuples so we can't modify them
+                # The following is a work around
+                temp = list(attribute)
+                temp[1] = attr_bins
+                temp = tuple(temp)
+                for i in range(len(self.attributes)):
+                    if self.attributes[i][0] == temp[0]:
+                        self.attributes[i] = temp
+                        break
+                        
+        
+    @staticmethod            
+    def get_bin(bin_list, value):
+        """Takes a list of NumericalDataBins and returns the bin for the value"""
+        for bin in bin_list:
+            if bin.belongs_to_bin(value):
+                return bin
+        # If we get here something has gone wrong
+        raise AssertionError("A bin was not found for a data point. This should never happen")
                 
     def get_splits(self, lower_index, upper_index, binning_attribute, core_attribute, gain_threshold, ranges):
         """ RANGES WILL CONTAIN ALL OF THE FINAL RANGE VALUES"""
@@ -185,6 +226,9 @@ class ArffProcessor(object):
         """ ASSUMES DATA IS SORTED ON BINNING_ATTRIBUTE
         @returns a tuple of one bool and 2 range tuples: (should_split, (min_value, ideal_split), (ideal_split, max_value))
         """
+        # If lower_index == upper_index then obviously there is nothing to split so should_split = false and we move on
+        if lower_index == upper_index:
+            return (False, (lower_index, lower_index), (lower_index, lower_index))
         # Get the bins starting entropy
         # TODO: Correct the following assumption
         # Assume that core_attributes are always categorical
@@ -210,7 +254,8 @@ class ArffProcessor(object):
         return (should_split, (range_min, ideal_split), (ideal_split, range_max))
 
     def entropy(self, lower_index, upper_index, split_point, binning_attribute, core_attribute):
-        """ ASSUMES DATA IS SORTED ON BINNING_ATTRIBUTE """
+        """ Determines entropy of a given split
+        ASSUMES DATA IS SORTED ON BINNING_ATTRIBUTE """
         sample_size = upper_index - lower_index + 1;
         probabilities = {}
         net_entropy = 0;
@@ -219,7 +264,7 @@ class ArffProcessor(object):
         lower_bin_size = 0
         upper_bin_size = 0
         # Get entropy for the bin less than split_point
-        for attr_value in self.attributes[self.attr_position[core_attribute]]:
+        for attr_value in self.attributes[self.attr_position[core_attribute]][1]:
             # Ensuring that none of the probabilities come out to 0 ensures the entropy calculation works
             probabilities[attr_value] = .5
         # Count the occurences of each core attribute value in the lower range
@@ -228,15 +273,18 @@ class ArffProcessor(object):
                 probabilities[self.data[i][self.attr_position[core_attribute]]] += 1
                 lower_bin_size += 1
         # Perform the actual entropy calculation
-        for attr_value in probabilities:
-            p = probabilities[attr_value] / lower_bin_size
-            lower_entropy += p * math.log2(p)
+        if lower_bin_size == 0:
+            lower_entropy = 0
+        else:
+            for attr_value in probabilities:
+                p = probabilities[attr_value] / lower_bin_size
+                lower_entropy += p * math.log2(p)
         # Multiply the result by negative 1 to factor in the fact that it is -Sum...
         lower_entropy *= -1
 
         # Repeat for the upper bin
         # Get entropy for the bin greater than or equal to split_point
-        for attr_value in self.attributes[self.attr_position[core_attribute]]:
+        for attr_value in self.attributes[self.attr_position[core_attribute]][1]:
             # Ensuring that none of the probabilities come out to 0 ensures the entropy calculation works
             probabilities[attr_value] = .5
         # Count the occurences of each core attribute value in the lower range
@@ -245,9 +293,12 @@ class ArffProcessor(object):
                 probabilities[self.data[i][self.attr_position[core_attribute]]] += 1
                 upper_bin_size += 1
         # Perform the actual entropy calculation
-        for attr_value in probabilities:
-            p = probabilities[attr_value] / upper
-            upper_entropy += p * math.log2(p)
+        if upper_bin_size == 0:
+            upper_entropy = 0
+        else:    
+            for attr_value in probabilities:
+                p = probabilities[attr_value] / upper_bin_size
+                upper_entropy += p * math.log2(p)
         # Multiply the result by negative 1 to factor in the fact that it is -Sum...
         upper_entropy *= -1.0
 
@@ -260,4 +311,4 @@ class ArffProcessor(object):
         self.attr_position = {}
         for i, attribute in enumerate(self.attributes):
             attr_name = attribute[0]
-            self.attr_position[attribute_name] = i
+            self.attr_position[attr_name] = i
