@@ -42,7 +42,7 @@ class NaiveBayesClassifier():
 
     def pxc(self, attr_value, core_attribute_value):
         # The following smooths these probabilities
-        if self.core_probabilities[self.core_attribute] == 0:
+        if self.core_probabilities[core_attribute_value] == 0:
             return self.probabilities[core_attribute_value][attr_value]
         else:
             return self.probabilities[core_attribute_value][attr_value]/self.core_probabilities[core_attribute_value]
@@ -50,9 +50,15 @@ class NaiveBayesClassifier():
     def classify_record(self, record):
         """Record is an array that must match the format of the arff data records"""
         classifications = {}
-        for core_value in self.arff.attributes[self.arff.attr_position[core_attribute]][1]:
+        for core_value in self.arff.attributes[self.arff.attr_position[self.core_attribute]][1]:
             classifications[core_value] = self.pc(core_value)
-            for i in len(record):
+            for i in range(len(record)):
                 if i != self.arff.attr_position[self.core_attribute]:
                     classifications[core_value] *= self.pxc(record[i], core_value)
-        return max(classifications)
+        best_classifier = ""
+        best_classifier_score = 0
+        for core_value in classifications:
+            if classifications[core_value] > best_classifier_score:
+                best_classifier_score = classifications[core_value]
+                best_classifier = core_value
+        return best_classifier

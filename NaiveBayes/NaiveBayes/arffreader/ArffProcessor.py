@@ -73,21 +73,21 @@ class ArffProcessor(object):
                 # Convert each data line into a list with the index corresponding to the attribute
                 data_line = [x.strip() for x in line.split(",")]
                 self.data.append(data_line)
-            # Convert numeric data into actual numbers instead of strings
-            self.map_attributes_to_num()
-            for attr in self.attributes:
-                attr_name = attr[0]
-                type = attr[1]
-                # The next if must be in this order to short circuit
-                if (not isinstance(type, list)) and (type.lower() == "numeric"):
-                    # Convert that column into actual numbers
-                    for entry in self.data:
-                        # We will try to convert it to an int first
-                        try:
-                            entry[self.attr_position[attr_name]] = int(entry[self.attr_position[attr_name]])
-                        except ValueError:
-                            # int conversion failed so make it a float
-                            entry[self.attr_position[attr_name]] = float(entry[self.attr_position[attr_name]])
+        # Convert numeric data into actual numbers instead of strings
+        self.map_attributes_to_num()
+        for attr in self.attributes:
+            attr_name = attr[0]
+            type = attr[1]
+            # The next if must be in this order to short circuit
+            if (not isinstance(type, list)) and (type.lower() == "numeric"):
+                # Convert that column into actual numbers
+                for entry in self.data:
+                    # We will try to convert it to an int first
+                    try:
+                        entry[self.attr_position[attr_name]] = int(entry[self.attr_position[attr_name]])
+                    except ValueError:
+                        # int conversion failed so make it a float
+                        entry[self.attr_position[attr_name]] = float(entry[self.attr_position[attr_name]])
         self.file.close()
 
     def fill_holes(self):
@@ -237,8 +237,10 @@ class ArffProcessor(object):
         ideal_split = (self.data[lower_index][self.attr_position[binning_attribute]] 
                        + self.data[lower_index + 1][self.attr_position[binning_attribute]]) / 2
         ideal_entropy = self.entropy(lower_index, upper_index, ideal_split, binning_attribute, core_attribute)
-        # Calculate the entropy for every possible split
-        for i in range(lower_index + 1, upper_index):
+        # Calculate the entropy for a number of possible splits
+        # We set a limit because otherwise this takes wayyyyy too long
+        step = max(1, (upper_index - (lower_index + 1)) // int(10*math.log10(upper_index - (lower_index)) + 1))
+        for i in range(lower_index + 1, upper_index, step):
             split = (self.data[i][self.attr_position[binning_attribute]] 
                        + self.data[i + 1][self.attr_position[binning_attribute]]) / 2
             split_entropy = self.entropy(lower_index, upper_index, split, binning_attribute, core_attribute)
