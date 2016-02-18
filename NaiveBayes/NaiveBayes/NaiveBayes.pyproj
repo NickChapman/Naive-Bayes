@@ -22,7 +22,7 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="arffreader\ArffFile.py" />
+    <Compile Include="arffreader\ArffProcessor.py" />
     <Compile Include="arffreader\__init__.py" />
     <Compile Include="NaiveBayes.py" />
     <Compile Include="utils.py">
