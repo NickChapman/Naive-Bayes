@@ -12,8 +12,6 @@ class ArffProcessor(object):
         self.load_file(file_path)
         # Map the attributes to their positions in the data line
         self.map_attributes_to_num()
-        # Remove '?' values from the data
-        self.fill_holes()
 
     def load_file(self, file_path):
         """Loads an ARFF file into memory and extracts all information
@@ -90,7 +88,7 @@ class ArffProcessor(object):
                         entry[self.attr_position[attr_name]] = float(entry[self.attr_position[attr_name]])
         self.file.close()
 
-    def fill_holes(self):
+    def fill_holes(self, core_attribute):
         """ Finds holes in the data and fills them in
         Numeric values are filled in with the attribute mean
         Categorical values are filled in with the attribute mode
@@ -125,21 +123,28 @@ class ArffProcessor(object):
                         # Choose at random
                         entry[self.attr_position[attr_name]] = random.choice(fill_choices)
             elif attr_values.lower() == "numeric":
-                total = 0
-                entries = 0
+                totals_count = {}
+                class_count = {}
+                for core_value in self.attributes[self.attr_position[core_attribute]][1]:
+                    totals_count[core_value] = 0
+                    class_count[core_value] = .01 #Prevents divide by zero
                 for entry in self.data:
                     entry_label_value = entry[self.attr_position[attr_name]]
                     if entry_label_value == "?":
                         # Skip this row
                         continue
-                    total += entry_label_value
-                    entries += 1
-                average = total / entries
+                    entry_core_value = entry[self.attr_position[core_attribute]]
+                    totals_count[entry_core_value] += entry_label_value
+                    class_count[entry_core_value] += 1
+                averages = {}
+                for core_value in totals_count:
+                    averages[core_value] = totals_count[core_value]/class_count[core_value]
                 # Now fill in this average where necessary
                 for entry in self.data:
                     entry_label_value = entry[self.attr_position[attr_name]]
                     if entry_label_value == "?":
-                        entry[self.attr_position[attr_name]] = average
+                        entry_core_value = entry[self.attr_position[core_attribute]]
+                        entry[self.attr_position[attr_name]] = averages[entry_core_value]
             else:
                 # TODO: Implement additional data type handlers
                 # For now we will raise an exception if we make it to here because

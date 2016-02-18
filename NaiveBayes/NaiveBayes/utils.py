@@ -59,3 +59,27 @@ class NumericalDataBin():
     def __hash__(self):
         hash_string = str(self.min) + "," + str(self.max)
         return fnv1a_64(hash_string)
+
+def micro_precision(core_values, confusion_matrices):
+    pass
+
+def micro_recall(core_values, confusion_matrices):
+    pass
+
+def micfo_f1(core_values, confusion_matrices):
+    pass
+
+def macro_function(core_values, confusion_matrices):
+    pass
+
+def accuracy(core_values, confusion_matrices):
+    tp_sum = 0
+    tn_sum = 0
+    fp_sum = 0
+    fn_sum = 0
+    for core_value in core_values:
+        tp_sum += confusion_matrices[core_value]["tp"]
+        tn_sum += confusion_matrices[core_value]["tn"]
+        fp_sum += confusion_matrices[core_value]["fp"]
+        fn_sum += confusion_matrices[core_value]["fn"]
+    return (tp_sum + tn_sum) / (tp_sum + tn_sum + fp_sum + fn_sum)
