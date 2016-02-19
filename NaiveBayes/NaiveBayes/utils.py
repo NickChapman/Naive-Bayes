@@ -38,39 +38,76 @@ class NumericalDataBin():
         self.max = kwargs.get("lt", float("inf"))
 
     def belongs_to_bin(self, item):
+        """Determines whether a value goes into this bin"""
         if not isinstance(item, int) and not isinstance(item, float):
             return False
         if item >= self.max or item < self.min:
             return False
         return True
 
-    def add_item(self, item):
-        if not isinstance(item, int) and not isinstance(item, float):
-            raise TypeError("NumericalDataBin is for numbers only")
-        if item > self.max or item < self.min:
-            raise ValueError("An item was added to the bin that is beyond the scope of the bin")
-        self.values.append(item)
-
     def __eq__(self, other):
+        """Overloaded equality
+        Simply compares on range min and max
+        """
         if self.min == other.min and self.max == other.max:
             return True
         return False
     
     def __hash__(self):
+        """Overloaded hash operator
+        Allows these data bins to be used as the keys in a dictionary
+        Implements the FNV1a hashing algorithm above
+        """
         hash_string = str(self.min) + "," + str(self.max)
         return fnv1a_64(hash_string)
 
 def micro_precision(core_values, confusion_matrices):
-    pass
+    tp_sum = 0
+    fp_sum = 0
+    for core_value in core_values:
+        tp_sum += confusion_matrices[core_value]["tp"]
+        fp_sum += confusion_matrices[core_value]["fp"]
+    return tp_sum / (tp_sum + fp_sum)
 
 def micro_recall(core_values, confusion_matrices):
-    pass
+    tp_sum = 0
+    fn_sum = 0
+    for core_value in core_values:
+        tp_sum += confusion_matrices[core_value]["tp"]
+        fn_sum += confusion_matrices[core_value]["fn"]
+    return tp_sum / (tp_sum + fn_sum)
 
 def micfo_f1(core_values, confusion_matrices):
-    pass
+    mp = micro_precision(core_values, confusion_matrices)
+    mr = micro_recall(core_values, confusion_matrices)
+    return 2 * mp * mr / (mp + mr)
 
-def macro_function(core_values, confusion_matrices):
-    pass
+def macro_precision(core_values, confusion_matrices):
+    precisions = []
+    for core_value in core_values:
+        tp = confusion_matrices[core_value]["tp"]
+        fp = confusion_matrices[core_value]["fp"]
+        precisions.append(tp / (tp + fp))
+    return sum(precisions) / len(precisions)
+
+def macro_recall(core_values, confusion_matrices):
+    recalls = []
+    for core_value in core_values:
+        tp = confusion_matrices[core_value]["tp"]
+        fn = confusion_matrices[core_value]["fn"]
+        recalls.append(tp / (tp + fn))
+    return sum(recalls) / len(recalls)
+
+def macro_f1(core_values, confusion_matrices):
+    f1s = []
+    for core_value in core_values:
+        tp = confusion_matrices[core_value]["tp"]
+        fp = confusion_matrices[core_value]["fp"]
+        fn = confusion_matrices[core_value]["fn"]
+        precision = tp / (tp + fp)
+        recall = tp / (tp + fn)
+        f1s.append(2 * precision * recall / (precision + recall))
+    return sum(f1s) / len(f1s)
 
 def accuracy(core_values, confusion_matrices):
     tp_sum = 0

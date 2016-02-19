@@ -38,6 +38,7 @@
   <ItemGroup>
     <Content Include="adult-big.arff" />
     <Content Include="adult-small.arff" />
+    <Content Include="adult.out" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
